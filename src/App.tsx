@@ -1,78 +1,31 @@
-import React, { useState , useRef} from 'react';
-import logo from './logo.svg';
-import './App.css';
+// src/App.tsx
+import React, { useState } from 'react';
+import SpeechToText from './components/speechToText';
+import { speakText } from './utils/speakSpeech';
 
-const App: React.FC = () => {
+const App = () => {
+  const [chat, setChat] = useState<string[]>([]);
 
-  const [transcript, setTranscript] = useState<string>('');
-  const [response, setResponse] = useState<string>('');
-  const RecognitionRef = useRef<SpeechRecognition | null>(null);
-
-  const handleStartRecording = async () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Speech Recognition is not supported in this browser');
-      return;
-    }
-    
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continus = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const result = event.results[0][0].transcript;
-      setTranscript(result);
-      handleCommend(result);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech Recognition Error:', event.error);
-    }
-    
-    RecognitionRef.current = recognition;
-    recognition.start();
-  }
-
-  const handleCommend = async (result: string) => {
-    
-      if(result.toLowerCase().includes('hello')) {
-        setResponse('Hello, how can I help you today?');
-        speak("Hello, how can I help you today?");
-      }else{
-        const res = await fetch('/api/gpt', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: result,
-          }),
-        });
-        const data = await res.json();
-        speak(data.reply);
-        setResponse(data.reply);
-      }
-    
-  }
-
-  const speak = (text: string) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(utterance);
-  }
+  const handleSpeech = async (text: string) => {
+    setChat(prev => [...prev, `You: ${text}`]);
+    const response = await fetch('http://localhost:5000/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: text }),
+    });
+    const data = await response.json();
+    setChat(prev => [...prev, `Bot: ${data.reply}`]);
+    speakText(data.reply);
+  };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-      </header>
+    <div>
+      <SpeechToText onText={handleSpeech} />
       <div>
-        <button onClick={handleStartRecording}>Start</button>
-        <p><strong>You:</strong> {transcript}</p>
-        <p><strong>AI:</strong> {response}</p>
+        {chat.map((line, i) => <div key={i}>{line}</div>)}
       </div>
     </div>
   );
-}
+};
 
 export default App;
